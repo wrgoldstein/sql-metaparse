@@ -4,8 +4,6 @@ import string
 wm = whitespace_map = dict.fromkeys(ord(c) for c in string.whitespace)
 
 
-# from lib.parser import parse_meta, parse_tables
-
 def test_parse_tables():
     q = "select * from foo"
     assert parse_meta(q)['tables'] == ['"foo"']
