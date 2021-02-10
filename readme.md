@@ -20,3 +20,7 @@ Usability:
 
   * Maybe co-opt database comments for documentation
   
+
+TODO
+1. Make a simple runner that builds a dag and runs it
+2. Make a simple docs site from table comments

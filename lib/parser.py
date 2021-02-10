@@ -7,11 +7,13 @@ from typing import List
 sformat = partial(sqlparse.format, reindent=True, keyword_case='lower')
 
 Whitespace = sqlparse.tokens.Whitespace
+Newline = sqlparse.tokens.Whitespace.Newline
 Punctuation = sqlparse.tokens.Punctuation
 Keyword = sqlparse.tokens.Keyword
 Name = sqlparse.tokens.Name
 Comment = sqlparse.tokens.Comment.Single
 Symbol = sqlparse.tokens.Literal.String.Symbol
+Literal = sqlparse.tokens.Literal.String.Single
 CTE = sqlparse.tokens.CTE
 DML = sqlparse.tokens.DML
 
@@ -95,10 +97,9 @@ def search_for_top_level_select(tokens):
             return tokens
 
 def _clean_column(column: tuple):
-    """
-    
-    """
     column_parts, comment_parts = column
+    if not column_parts:
+        return
     name = column_parts[-1]
     column = sformat(" ".join(column_parts))
     comment_parts = [ s.lstrip("-").strip() for s in comment_parts]
@@ -113,25 +114,43 @@ def parse_columns(tokens: List[sqlparse.tokens._TokenType]) -> List[tuple]:
     """
     tokens = list(tokens.flatten())
     tokens = search_for_top_level_select(tokens)
-    tokens = list(dropwhile(lambda t: t.ttype == Whitespace, tokens))
+    if not tokens:
+        return []
+    tokens = list(filter(lambda t: t.ttype not in [Whitespace, Newline], tokens))
     columns = []
     current_column = []
     current_comments = []
+    nesting = []
+    deb = False
+
     while len(tokens) > 0:
         token, *tokens = tokens
 
-        if token.ttype in [Keyword, Name, Symbol]:
+        if token.value == "(":
+            nesting.append("(")
             current_column.append(token.value)
-        elif token.ttype == Comment:
-            current_comments.append(token.value)
-        elif token.normalized == 'FROM' or token.value == ",":
+        elif token.value == ")":
+            nesting.pop()
+            current_column.append(token.value)
+        elif len(nesting) > 0:
+            current_column.append(token.value)
+        elif token.normalized == 'FROM':
+            break
+        elif token.value == ",":
             # done with this column
             columns.append((current_column, current_comments))
             current_column = []
             current_comments = []
+            nesting = []
+        elif token.ttype == Comment:
+            current_comments.append(token.value)
+        elif token.ttype in [Keyword, Name, Symbol, Literal]:
+            current_column.append(token.value)
+
     if current_column:
         columns.append((current_column, current_comments))
-    columns = list(map(_clean_column, columns))
+    columns = list(filter(lambda x: x, map(_clean_column, columns)))
+
     return columns
 
 def parse_tables(tokens: List[sqlparse.tokens._TokenType]) -> List[str]:
