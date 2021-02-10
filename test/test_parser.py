@@ -1,4 +1,4 @@
-from lib.parser import parse_meta
+from sql_metaparse import parse_meta
 import string
 
 wm = whitespace_map = dict.fromkeys(ord(c) for c in string.whitespace)
